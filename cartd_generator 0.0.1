@@ -1,0 +1,131 @@
+from PIL import Image, ImageDraw, ImageFont
+import textwrap
+import os
+
+# ---------------------------------------------------------
+# Scale AND crop image to fully cover a frame (no borders)
+# ---------------------------------------------------------
+def scale_and_crop(img, frame_width, frame_height):
+    img_ratio = img.width / img.height
+    frame_ratio = frame_width / frame_height
+
+    # Scale up until image fully covers the frame
+    if img_ratio > frame_ratio:
+        new_height = frame_height
+        new_width = int(frame_height * img_ratio)
+    else:
+        new_width = frame_width
+        new_height = int(frame_width / img_ratio)
+
+    img = img.resize((new_width, new_height), Image.LANCZOS)
+
+    # Center crop
+    left = (new_width - frame_width) // 2
+    top = (new_height - frame_height) // 2
+    right = left + frame_width
+    bottom = top + frame_height
+
+    return img.crop((left, top, right, bottom))
+
+
+# ---------------------------------------------------------
+# Card Generator
+# ---------------------------------------------------------
+class CardGenerator:
+    def __init__(self, sleeves_folder, font_path="arial.ttf"):
+        self.sleeves_folder = sleeves_folder
+
+        # Fonts
+        self.font_title = ImageFont.truetype(font_path, 40)
+        self.font_stats = ImageFont.truetype(font_path, 32)
+        self.font_desc = ImageFont.truetype(font_path, 26)
+
+        # Layout (your exact coordinates)
+        self.ART_X = 17
+        self.ART_Y = 85
+        self.ART_W = 715
+        self.ART_H = 644
+
+        self.NAME_X = 126
+        self.NAME_Y = 19
+
+        self.HEALTH_X = 37
+        self.HEALTH_Y = 747
+
+        self.ATTACK_X = 346
+        self.ATTACK_Y = 747
+
+        self.DESC_X = 51
+        self.DESC_Y = 814
+
+    def wrap_text(self, text, width):
+        return textwrap.fill(text, width=width)
+
+    def load_sleeve(self, role):
+        role = role.lower()
+        filename = f"{role}_sleeve.png"
+        full_path = os.path.join(self.sleeves_folder, filename)
+
+        if not os.path.exists(full_path):
+            raise FileNotFoundError(f"Sleeve not found: {full_path}")
+
+        return Image.open(full_path).convert("RGBA")
+
+    def create_card(self, art_path, name, health, attack, role, description, output_path):
+        # Load sleeve based on role
+        card = self.load_sleeve(role)
+
+        draw = ImageDraw.Draw(card)
+
+        # -----------------------------
+        # ART (scale + crop to frame)
+        # -----------------------------
+        art = Image.open(art_path).convert("RGBA")
+        art = scale_and_crop(art, self.ART_W, self.ART_H)
+        card.paste(art, (self.ART_X, self.ART_Y), art)
+
+        # -----------------------------
+        # NAME
+        # -----------------------------
+        draw.text((self.NAME_X, self.NAME_Y), name, font=self.font_title, fill="black")
+
+        # -----------------------------
+        # HEALTH
+        # -----------------------------
+        draw.text((self.HEALTH_X, self.HEALTH_Y), f"HP: {health}", font=self.font_stats, fill="black")
+
+        # -----------------------------
+        # ATTACK
+        # -----------------------------
+        draw.text((self.ATTACK_X, self.ATTACK_Y), f"ATK: {attack}", font=self.font_stats, fill="black")
+
+        # -----------------------------
+        # DESCRIPTION
+        # -----------------------------
+        wrapped = self.wrap_text(description, width=60)
+        draw.text((self.DESC_X, self.DESC_Y), wrapped, font=self.font_desc, fill="black")
+
+        # -----------------------------
+        # SAVE
+        # -----------------------------
+        card.save(output_path)
+        print(f"Card saved to {output_path}")
+
+
+# ---------------------------------------------------------
+# Example usage
+# ---------------------------------------------------------
+if __name__ == "__main__":
+    gen = CardGenerator(
+        sleeves_folder=r"C:\Users\Redux\Desktop\cartd_generator\sleeves"
+    )
+
+    gen.create_card(
+        art_path=r"C:\Users\Redux\Desktop\cartd_generator\uploaded_art.png",
+        name="Cyber Vandall",
+        health=6,
+        attack=9,
+        role="melee",  # loads tank_sleeve.png
+        description="Tech hungry savant, constantly gooning at artwork",
+        output_path=r"C:\Users\Redux\Desktop\cartd_generator\final_card.png"
+    )
